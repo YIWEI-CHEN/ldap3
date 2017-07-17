@@ -75,7 +75,7 @@ class Tls(object):
                  ca_certs_path=None,
                  ca_certs_data=None,
                  local_private_key_password=None,
-                 ssl_context_options=None,
+                 only_TLSv1_2=None,
                  ssl_context_ciphers=None):
 
         if validate in [ssl.CERT_NONE, ssl.CERT_OPTIONAL, ssl.CERT_REQUIRED]:
@@ -124,14 +124,14 @@ class Tls(object):
         else:
             self.private_key_password = None
 
-        if ssl_context_options and use_ssl_context:
-            self.ssl_context_options = ssl_context_options
-        elif ssl_context_options:
+        if only_TLSv1_2 and use_ssl_context:
+            self.only_TLSv1_2 = only_TLSv1_2
+        elif only_TLSv1_2:
             if log_enabled(ERROR):
-                log(ERROR, 'cannot use SSLContext options, SSLContext not available')
-            raise LDAPSSLNotSupportedError('cannot use SSL Context options, SSLContext not available')
+                log(ERROR, 'cannot enforce TLS v1.2, SSLContext not available')
+            raise LDAPSSLNotSupportedError('cannot enforce TLS v1.2, SSLContext not available')
         else:
-            self.ssl_context_options = None
+            self.only_TLSv1_2 = None 
 
         if ssl_context_ciphers and use_ssl_context:
             self.ssl_context_ciphers = ssl_context_ciphers
@@ -159,7 +159,7 @@ class Tls(object):
             'CA certificates file: ' + ('present ' if self.ca_certs_file else 'not present'),
             'CA certificates path: ' + ('present ' if self.ca_certs_path else 'not present'),
             'CA certificates data: ' + ('present ' if self.ca_certs_data else 'not present'),
-            'ssl context options: ' + ('present ' if self.ssl_context_options else 'not present'),
+            'only TLS v1.2: ' + ('present ' if self.only_TLSv1_2 else 'not present'),
             'ssl context ciphers: ' + ('present ' if self.ssl_context_ciphers else 'not present'),
             'verify mode: ' + str(self.validate),
             'valid names: ' + str(self.valid_names)
@@ -174,7 +174,7 @@ class Tls(object):
         r += '' if self.ca_certs_file is None else ', ca_certs_file={0.ca_certs_file!r}'.format(self)
         r += '' if self.ca_certs_path is None else ', ca_certs_path={0.ca_certs_path!r}'.format(self)
         r += '' if self.ca_certs_data is None else ', ca_certs_data={0.ca_certs_data!r}'.format(self)
-        r += '' if self.ssl_context_options is None else ', ssl_context_options={0.ssl_context_options!r}'.format(self)
+        r += '' if self.only_TLSv1_2 is None else ', only_TLSv1_2={0.only_TLSv1_2!r}'.format(self)
         r += '' if self.ssl_context_ciphers is None else ', ssl_context_ciphers={0.ssl_context_ciphers!r}'.format(self)
         r = 'Tls(' + r[2:] + ')'
         return r
@@ -200,8 +200,13 @@ class Tls(object):
             if self.private_key_file:
                 ssl_context.load_cert_chain(self.certificate_file, keyfile=self.private_key_file, password=self.private_key_password)
 
-            if self.ssl_context_options:
-                ssl_context.options |= self.ssl_context_options
+            ssl_context.options |= ssl.OP_NO_SSLv2
+            ssl_context.options |= ssl.OP_NO_SSLv3
+            ssl_context.options &= ~ssl.OP_NO_TLSv1_2
+
+            if self.only_TLSv1_2:
+                ssl_context.options |= self.OP_NO_TLSv1
+                ssl_context.options |= self.OP_NO_TLSv1_1
 
             if self.ssl_context_ciphers:
                 ssl_context.set_ciphers(self.ssl_context_ciphers)
